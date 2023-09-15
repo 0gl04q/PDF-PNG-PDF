@@ -1,5 +1,6 @@
 import os
 import shutil
+import threading
 from PIL import Image
 from pathlib import Path
 from pdf2image import convert_from_path
@@ -19,7 +20,7 @@ class FilePPP:
     def __init__(self, pdf_path, save_path, name):
         self.pdf_path = pdf_path
         self.save_path = save_path
-        self.png_path = os.path.join(PATH_PNG, name+'.png')
+        self.png_path = os.path.join(PATH_PNG, name + '.png')
 
     def convert_pdf_to_png(self):
         """
@@ -33,6 +34,9 @@ class FilePPP:
         """
             Функция создания PDF на основе PNG файла
         """
+
+        # Вызываем создание PNG
+        self.convert_pdf_to_png()
 
         # Выставляем размеры страницы A4
         width, height = landscape(A4)
@@ -55,9 +59,31 @@ class FilePPP:
         c.save()
 
 
+def convert_file(pdf_file_obj):
+    semaphore.acquire()  # Приобретаем семафор
+    try:
+        # Задаем путь к файлу и путь сохранения файл
+        pdf_file_path = str(pdf_file_obj)
+        pdf_file_save_path = os.path.join(PATH_PDF, str(pdf_file_obj).replace(PATH_MAIN, '').strip('\\'))
+
+        # Проверка на существование файла
+        if not os.path.exists(pdf_file_save_path):
+            # Выполняем преобразование с экземпляром
+            file = FilePPP(pdf_file_path, pdf_file_save_path, pdf_file_obj.name)
+            try:
+                file.convert_png_to_pdf()
+            finally:
+                # Удаляем временный файл
+                os.remove(file.png_path)
+            print(f'Файл создан: {pdf_file_save_path}')
+
+    finally:
+        semaphore.release()
+
+
 def make_dir():
     """
-        Функция создания необходимых папок при включении программы
+        Функция создания необходимых и временных папок при включении программы
     """
     if not os.path.exists(PATH_PNG):
         os.mkdir(PATH_PNG)
@@ -78,10 +104,13 @@ if __name__ == '__main__':
     # Создаем необходимые папки
     make_dir()
 
+    max_threads = 10  # Выставляем количество потоков 10
+    semaphore = threading.Semaphore(max_threads)
+    threads = []
+
     try:
         # Перебираем папки и файлы для создания структуры
-        p = Path(PATH_MAIN)
-        for pdf_file in p.rglob("*"):
+        for pdf_file in Path(PATH_MAIN).rglob("*"):
             # Создаем необходимую структуру
             if pdf_file.is_dir():
                 dir_in_tree = os.path.join(PATH_PDF, str(pdf_file).replace(PATH_MAIN, '').strip('\\'))
@@ -90,23 +119,19 @@ if __name__ == '__main__':
                     print(f'Папка создана: {dir_in_tree}')
 
             if pdf_file.is_file():
-                # Задаем путь к файлу и путь сохранения файл
-                pdf_file_path = str(pdf_file)
-                pdf_file_save_path = os.path.join(PATH_PDF, str(pdf_file).replace(PATH_MAIN, '').strip('\\'))
+                # Создаем поток работы программы
+                t = threading.Thread(target=convert_file, args=(pdf_file,))
+                threads.append(t)
+                t.start()
 
-                # Проверка на существование файла
-                if not os.path.exists(pdf_file_save_path):
-                    # Выполняем преобразование с экземпляром
-                    file = FilePPP(pdf_file_path, pdf_file_save_path, pdf_file.name)
-                    file.convert_pdf_to_png()
-                    file.convert_png_to_pdf()
-                    print(f'Файл создан: {pdf_file_save_path}')
+        # Ожидаем окончания всех потоков
+        [thread.join() for thread in threads]
+
+    finally:
+        # Очистка папок временных файлов
+        if os.path.exists(PATH_PNG):
+            shutil.rmtree(PATH_PNG)
 
         print('-' * 100)
         print('Завершение работы программы'.rjust(60))
         print('-' * 100)
-
-    finally:
-        # Очистка временных файлов
-        if os.path.exists(PATH_PNG):
-            shutil.rmtree(PATH_PNG)
