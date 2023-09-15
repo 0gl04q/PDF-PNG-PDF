@@ -111,9 +111,6 @@ if __name__ == '__main__':
     print('Запуск программы'.rjust(55))
     print('-' * 100)
 
-    # Все объекты
-    all_obj = Path(PATH_MAIN).rglob("*")
-
     # Создаем необходимые папки
     make_dir()
 
