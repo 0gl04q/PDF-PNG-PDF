@@ -58,6 +58,9 @@ class FilePPP:
         c.showPage()
         c.save()
 
+        # Удаляем исходник
+        os.remove(self.pdf_path)
+
 
 def convert_file(pdf_file_obj):
     semaphore.acquire()  # Приобретаем семафор
@@ -72,10 +75,10 @@ def convert_file(pdf_file_obj):
             file = FilePPP(pdf_file_path, pdf_file_save_path, pdf_file_obj.name)
             try:
                 file.convert_png_to_pdf()
+                print(f'Файл создан: {pdf_file_save_path}')
             finally:
                 # Удаляем временный файл
                 os.remove(file.png_path)
-            print(f'Файл создан: {pdf_file_save_path}')
 
     finally:
         semaphore.release()
@@ -90,6 +93,13 @@ def make_dir():
     if not os.path.exists(PATH_PDF):
         os.mkdir(PATH_PDF)
 
+    # Перебираем папки создания структуры
+    for directory in filter(lambda d: d.is_dir(), Path(PATH_MAIN).rglob("*")):
+        dir_in_tree = os.path.join(PATH_PDF, str(directory).replace(PATH_MAIN, '').strip('\\'))
+        if not os.path.exists(dir_in_tree):
+            os.mkdir(dir_in_tree)
+            print(f'Папка создана: {dir_in_tree}')
+
 
 if __name__ == '__main__':
 
@@ -101,36 +111,30 @@ if __name__ == '__main__':
     print('Запуск программы'.rjust(55))
     print('-' * 100)
 
+    # Все объекты
+    all_obj = Path(PATH_MAIN).rglob("*")
+
     # Создаем необходимые папки
     make_dir()
 
-    max_threads = 10  # Выставляем количество потоков 10
+    max_threads = 5  # Выставляем количество потоков 10
     semaphore = threading.Semaphore(max_threads)
     threads = []
 
     try:
-        # Перебираем папки и файлы для создания структуры
-        for pdf_file in Path(PATH_MAIN).rglob("*"):
-            # Создаем необходимую структуру
-            if pdf_file.is_dir():
-                dir_in_tree = os.path.join(PATH_PDF, str(pdf_file).replace(PATH_MAIN, '').strip('\\'))
-                if not os.path.exists(dir_in_tree):
-                    os.mkdir(dir_in_tree)
-                    print(f'Папка создана: {dir_in_tree}')
-
-            if pdf_file.is_file():
-                # Создаем поток работы программы
-                t = threading.Thread(target=convert_file, args=(pdf_file,))
-                threads.append(t)
-                t.start()
+        # Перебираем файлы
+        for pdf_file in filter(lambda f: f.is_file(), Path(PATH_MAIN).rglob("*")):
+            # Создаем поток работы программы
+            t = threading.Thread(target=convert_file, args=(pdf_file,))
+            threads.append(t)
+            t.start()
 
         # Ожидаем окончания всех потоков
         [thread.join() for thread in threads]
 
     finally:
         # Очистка папок временных файлов
-        if os.path.exists(PATH_PNG):
-            shutil.rmtree(PATH_PNG)
+        shutil.rmtree(PATH_PNG)
 
         print('-' * 100)
         print('Завершение работы программы'.rjust(60))
