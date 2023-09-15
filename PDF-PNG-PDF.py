@@ -41,20 +41,9 @@ class FilePPP:
         # Выставляем размеры страницы A4
         width, height = landscape(A4)
 
-        # Получаем размеры PNG из файла
-        with Image.open(self.png_path) as img:
-            image_width, image_height = img.size
-
-        # Находим масштаб
-        scale_x = image_width / width
-        scale_y = image_height / height
-
-        # Выбор минимального масштаба
-        scale = min(scale_x, scale_y)
-
         # Создаем и сохраняем файл
         c = canvas.Canvas(self.save_path, pagesize=landscape(A4))
-        c.drawImage(self.png_path, 0, 0, width * scale, height * scale)
+        c.drawImage(self.png_path, 0, 0, width, height)
         c.showPage()
         c.save()
 
