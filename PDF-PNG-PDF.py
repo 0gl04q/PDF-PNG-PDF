@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # Создаем необходимые папки
     make_dir()
 
-    max_threads = 5  # Выставляем количество потоков 10
+    max_threads = 5  # Выставляем количество потоков 5
     semaphore = threading.Semaphore(max_threads)
     threads = []
 
