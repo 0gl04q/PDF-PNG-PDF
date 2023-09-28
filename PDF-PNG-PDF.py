@@ -1,15 +1,14 @@
 import os
 import shutil
 import threading
-from PIL import Image
 from pathlib import Path
 from pdf2image import convert_from_path
 from reportlab.lib.pagesizes import landscape, A4
 from reportlab.pdfgen import canvas
 
-PATH_MAIN = os.path.join(os.getcwd(), 'PDF-ATM')
+PATH_MAIN = os.path.join(os.getcwd(), 'PDF')
 PATH_PNG = os.path.join(os.getcwd(), 'PNG')
-PATH_PDF = os.path.join(os.getcwd(), 'SCAN-PDF-АТМ')
+PATH_PDF = os.path.join(os.getcwd(), 'SCAN-PDF')
 
 
 class FilePPP:
@@ -20,7 +19,8 @@ class FilePPP:
     def __init__(self, pdf_path, save_path, name):
         self.pdf_path = pdf_path
         self.save_path = save_path
-        self.png_path = os.path.join(PATH_PNG, name + '.png')
+        self.name = name
+        self.png_paths = []
 
     def convert_pdf_to_png(self):
         """
@@ -28,7 +28,12 @@ class FilePPP:
         """
 
         images = convert_from_path(f'{self.pdf_path}', dpi=300)
-        images[0].save(self.png_path, 'PNG')
+
+        for i, img in enumerate(images):
+            print(f'Создаем PNG {self.name}_{i}.png')
+            png_path = os.path.join(PATH_PNG, f'{self.name}_{i}.png')
+            img.save(png_path, 'PNG')
+            self.png_paths.append(png_path)
 
     def convert_png_to_pdf(self):
         """
@@ -41,11 +46,15 @@ class FilePPP:
         # Выставляем размеры страницы A4
         width, height = landscape(A4)
 
-        # Создаем и сохраняем файл
         c = canvas.Canvas(self.save_path, pagesize=landscape(A4))
-        c.drawImage(self.png_path, 0, 0, width, height)
-        c.showPage()
+        # Создаем и сохраняем файл
+        for png_path in self.png_paths:
+            c.drawImage(png_path, 0, 0, width, height)
+            c.showPage()
         c.save()
+
+        for png_path in self.png_paths:
+            os.remove(png_path)
 
         # Удаляем исходник
         os.remove(self.pdf_path)
@@ -62,12 +71,8 @@ def convert_file(pdf_file_obj):
         if not os.path.exists(pdf_file_save_path):
             # Выполняем преобразование с экземпляром
             file = FilePPP(pdf_file_path, pdf_file_save_path, pdf_file_obj.name)
-            try:
-                file.convert_png_to_pdf()
-                print(f'Файл создан: {pdf_file_save_path}')
-            finally:
-                # Удаляем временный файл
-                os.remove(file.png_path)
+            file.convert_png_to_pdf()
+            print(f'Файл создан: {pdf_file_save_path}')
 
     finally:
         semaphore.release()
